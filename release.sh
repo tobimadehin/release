@@ -112,12 +112,87 @@ if [[ -n $(git status --porcelain) ]]; then
     error "Working directory not clean. Commit or stash changes first."
 fi
 
+# Update package manager
+update_package_files() {
+    local version="${1#v}"  # Remove 'v' prefix for package files
+    
+    # Update package.json (Node.js/npm)
+    if [[ -f "package.json" ]]; then
+        info "Updating package.json version to $version"
+        if command -v jq >/dev/null 2>&1; then
+            jq ".version = \"$version\"" package.json > package.json.tmp && mv package.json.tmp package.json
+        else
+            sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"$version\"/" package.json && rm -f package.json.bak
+        fi
+        git add package.json
+    fi
+    
+    # Update Cargo.toml (Rust)
+    if [[ -f "Cargo.toml" ]]; then
+        info "Updating Cargo.toml version to $version"
+        sed -i.bak "s/^version = \"[^\"]*\"/version = \"$version\"/" Cargo.toml && rm -f Cargo.toml.bak
+        git add Cargo.toml
+    fi
+    
+    # Update pyproject.toml (Python)
+    if [[ -f "pyproject.toml" ]]; then
+        info "Updating pyproject.toml version to $version"
+        sed -i.bak "s/^version = \"[^\"]*\"/version = \"$version\"/" pyproject.toml && rm -f pyproject.toml.bak
+        git add pyproject.toml
+    fi
+    
+    # Update composer.json (PHP)
+    if [[ -f "composer.json" ]]; then
+        info "Updating composer.json version to $version"
+        if command -v jq >/dev/null 2>&1; then
+            jq ".version = \"$version\"" composer.json > composer.json.tmp && mv composer.json.tmp composer.json
+        else
+            sed -i.bak "s/\"version\": \"[^\"]*\"/\"version\": \"$version\"/" composer.json && rm -f composer.json.bak
+        fi
+        git add composer.json
+    fi
+    
+    # Update pom.xml (Java/Maven)
+    if [[ -f "pom.xml" ]]; then
+        info "Updating pom.xml version to $version"
+        sed -i.bak "s/<version>[^<]*<\/version>/<version>$version<\/version>/" pom.xml && rm -f pom.xml.bak
+        git add pom.xml
+    fi
+    
+    # Update build.gradle (Java/Gradle)
+    if [[ -f "build.gradle" ]] || [[ -f "build.gradle.kts" ]]; then
+        for gradle_file in build.gradle build.gradle.kts; do
+            if [[ -f "$gradle_file" ]]; then
+                info "Updating $gradle_file version to $version"
+                sed -i.bak "s/version = '[^']*'/version = '$version'/" "$gradle_file" && rm -f "$gradle_file.bak"
+                sed -i.bak "s/version \"[^\"]*\"/version \"$version\"/" "$gradle_file" && rm -f "$gradle_file.bak"
+                git add "$gradle_file"
+            fi
+        done
+    fi
+}
+
+# Update package manager files
+update_package_files "$NEW_VERSION"
+
+# Commit version updates if any files were modified
+if [[ -n $(git diff --cached --name-only) ]]; then
+    info "Committing version updates..."
+    git commit -m "Bump version to $NEW_VERSION"
+fi
+
 # Create and push tag
 info "Creating tag $NEW_VERSION..."
 git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
 
 info "Pushing tag to origin..."
 git push origin "$NEW_VERSION"
+
+# Push version commit if it exists
+if [[ -n $(git log origin/$(git branch --show-current)..HEAD --oneline) ]]; then
+    info "Pushing version commit..."
+    git push origin "$(git branch --show-current)"
+fi
 
 success "Tag $NEW_VERSION created and pushed."
 success "CI/CD pipeline will now handle build and release."

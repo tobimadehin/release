@@ -6,6 +6,7 @@ A minimal, no-dependency Bash utility for managing semantic version releases in 
 - Auto-bumps `major`, `minor`, or `patch` versions.
 - Supports pre-releases (`--beta`).
 - Cleans up stale or conflicting local tags (`--clean-tags`).
+- Automatically updates package manager files (package.json, Cargo.toml, pyproject.toml, etc.).
 - Works on any Git repository with zero setup.
 
 ---
